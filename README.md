@@ -20,7 +20,7 @@ Not much more code than the P controller, no learning, only needs to keep track 
 I didn't even need to add a separate PD controller for the cart position, or the I term!
 
 # Reinforcement learning
-## ASE / ACE (Sutton & Barto, 1983)
+## [ASE / ACE](ase_ace/ASE_ACE.ipynb) (Sutton & Barto, 1983)
 Ancestor of modern actor-critic methods! From RL legends, Sutton & Barto.
 Discretizes the observation into 162 "boxes", specified by a preivous work by Michie & Chambers.
 ASE stands for Associative Search Element; produces control action from the one-hot box vector + reinforcement signal (external or internal).
