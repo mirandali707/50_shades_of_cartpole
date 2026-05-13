@@ -18,3 +18,16 @@ Do the same thing as the P (proportional) controller except add another term tha
 
 Not much more code than the P controller, no learning, only needs to keep track of the last error. And, it SOLVES CARTPOLE! 500.00 ± 0.00 steps (the max for this Cartpole env) straight out of the box (notably I used someone else's hand-tuned gain).
 I didn't even need to add a separate PD controller for the cart position, or the I term!
+
+# Reinforcement learning
+## ASE / ACE (Sutton & Barto, 1983)
+Ancestor of modern actor-critic methods! From RL legends, Sutton & Barto.
+Discretizes the observation into 162 "boxes", specified by a preivous work by Michie & Chambers.
+ASE stands for Associative Search Element; produces control action from the one-hot box vector + reinforcement signal (external or internal).
+ACE stands for Adaptive Critic Element;
+helps with credit assignment by computing internal reward / reinforcement signal from the box vector (state representation) + sparse external reinforcement signal (-1 if failure, 0 otherwise).
+
+![](img/ase_ace.png)
+
+Doesn't do as well as the paper suggests, probably because the box discretization is tuned for their specific simulation (equations at the end of the paper), which OpenAI Gym doesn't reproduce exactly.
+Also, a fairly complicated implementation.
