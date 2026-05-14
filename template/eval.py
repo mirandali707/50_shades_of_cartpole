@@ -9,38 +9,34 @@ env = gym.make(
     render_mode="none",
 )
 
-N_TRIALS = 100
+N_EVAL_TRIALS = 100
 N_REPS = 10
 
 # prng key
 key = jax.random.PRNGKey(0)
 
-def train_loop(
-    init_agent, 
+def eval_loop(
+    init_trained_agent, 
     reset_agent, 
     get_action, 
-    update, 
-    model_name,
-    save_trained_agent
+    model_name
 ):
     all_trial_results = []
-    curr_best_model = None
-    curr_best_last_k = -1
 
     for rep in range(N_REPS):
         # independent key per rep, derived from rep index via fold_in
         key = jax.random.fold_in(jax.random.PRNGKey(0), rep)
 
-        # initialize model
-        state = init_agent()
+        # TODO
+        state = init_trained_agent()
 
         trial_results = []
 
-        pbar = tqdm(range(N_TRIALS), desc=f"repeat {rep}")
+        pbar = tqdm(range(N_EVAL_TRIALS), desc=f"repeat {rep}")
         for trial_idx in pbar:
             observation, info = env.reset()
 
-            # optionally reset the agent
+            # TODO optionally reset the agent
             state = reset_agent(state)
 
             episode_over = False
@@ -50,7 +46,7 @@ def train_loop(
                 # this is the nice jax way to get a new random seed which is properly independent
                 key, act_key = jax.random.split(key)
 
-                # get action (use act_key if it is random)
+                # TODO get action (use act_key if it is random)
                 action = get_action(state, observation, act_key)
 
                 prev_observation = observation
@@ -59,36 +55,22 @@ def train_loop(
                 observation, reward, terminated, truncated, info = env.step(action)
                 steps += 1
 
-                # do something with the new info
-                state = update(state, prev_observation, action, observation, reward, terminated, truncated, info)
-
                 episode_over = terminated or truncated
 
             trial_results.append(steps)
             pbar.set_postfix({"steps": steps})
         
         pbar.close()
-
-        # model checkpoint - save best-performing model (greatest average of last k trial results)
-        avg_last_k = trial_results[:, -K]  # shape (N_REPS,K)
-        if avg_last_k > curr_best_last_k:
-            curr_best_model = state
-            curr_best_last_k = avg_last_k
-
         all_trial_results.append(trial_results)
 
     env.close()
 
     all_trial_results = np.array(all_trial_results)  # shape (N_REPS, N_TRIALS)
-    np.save(f"{model_name}_100_trial_results.npy", all_trial_results)
+    np.save(f"{model_name}_100_eval_results.npy", all_trial_results)
 
     # Compute average + std steps alive over the last K trials across reps
-    K = 5
-    final_trial_steps = all_trial_results[:, -K]  # shape (N_REPS,K)
-    mean_final = final_trial_steps.mean()
-    std_final = final_trial_steps.std()
-    print(f"Final trial (#{N_TRIALS}) steps alive across {N_REPS} reps: "
+    mean_final = all_trial_results.mean()
+    std_final = all_trial_results.std()
+    print(f"Final trial (#{N_EVAL_TRIALS}) steps alive across {N_REPS} reps: "
         f"{mean_final:.2f} ± {std_final:.2f}")
-    
-    save_trained_agent(curr_best_model)
     return all_trial_results
