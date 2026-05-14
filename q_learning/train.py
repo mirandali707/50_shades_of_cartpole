@@ -15,10 +15,19 @@ N_REPS = 10
 # prng key
 key = jax.random.PRNGKey(0)
 
+K = 5
+
 def train_loop(
-    init_agent, reset_agent, get_action, update, model_name
+    init_agent,
+    reset_agent,
+    get_action,
+    update,
+    model_name,
+    save_trained_agent,
 ):
     all_trial_results = []
+    curr_best_model = None
+    curr_best_last_k = -1
 
     for rep in range(N_REPS):
         # independent key per rep, derived from rep index via fold_in
@@ -63,6 +72,12 @@ def train_loop(
             pbar.set_postfix({"steps": steps})
         
         pbar.close()
+
+        avg_last_k = np.mean(trial_results[-K:])
+        if avg_last_k > curr_best_last_k:
+            curr_best_model = state
+            curr_best_last_k = avg_last_k
+
         all_trial_results.append(trial_results)
 
     env.close()
@@ -71,10 +86,10 @@ def train_loop(
     np.save(f"{model_name}_100_trial_results.npy", all_trial_results)
 
     # Compute average + std steps alive over the last K trials across reps
-    K = 5
     final_trial_steps = all_trial_results[:, -K]  # shape (N_REPS,K)
     mean_final = final_trial_steps.mean()
     std_final = final_trial_steps.std()
     print(f"Final trial (#{N_TRIALS}) steps alive across {N_REPS} reps: "
         f"{mean_final:.2f} ± {std_final:.2f}")
+    save_trained_agent(curr_best_model)
     return all_trial_results

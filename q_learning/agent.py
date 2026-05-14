@@ -1,6 +1,7 @@
 from typing import NamedTuple
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from boxes import get_box, N_BOXES
 
@@ -61,3 +62,17 @@ get_action = get_e_greedy_action
 update = update_q_table
 
 model_name = "Boxes Q-learning"
+
+SAVE_PATH = "q_learner_best.npz"
+
+def save_trained_agent(state):
+    np.savez(SAVE_PATH, q_table=np.array(state.q_table), eps=state.eps, alpha=state.alpha, gamma=state.gamma)
+
+def init_trained_agent():
+    data = np.load(SAVE_PATH)
+    return QLearnerState(
+        q_table=jnp.array(data["q_table"]),
+        eps=float(data["eps"]),
+        alpha=float(data["alpha"]),
+        gamma=float(data["gamma"]),
+    )
