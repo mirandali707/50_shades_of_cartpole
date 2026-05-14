@@ -9,6 +9,12 @@ NMM 2026 final project: RL vs classical control methods for cartpole.
 # But first, a random baseline...
 For the discrete action space, randomly choosing an action (0 or 1) yields 17.70 ± 4.31 steps after 100 trials.
 
+# Search
+## [Pure random search](pure_random_search/main.ipynb)
+Here we randomly initialize a weight vector $w$ and roll out a trajectory (trial/episode) with it. If that trajectory produced the highest reward we've seen so far, we keep that $w$ as our best $w$, otherwise we do nothing. Then we randomly sample another $w$ vector and try again, and so on and so forth.
+
+65.44 ± 111.25 steps, taking the best of 10 models after 1000 rollouts per model.
+
 # Classical control
 ## [PID](pid/PID.ipynb)
 ### P (proportional) on pole angle
