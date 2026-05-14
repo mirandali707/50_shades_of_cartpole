@@ -71,6 +71,6 @@ def eval_loop(
     # Compute average + std steps alive over the last K trials across reps
     mean_final = all_trial_results.mean()
     std_final = all_trial_results.std()
-    print(f"Final trial (#{N_EVAL_TRIALS}) steps alive across {N_REPS} reps: "
+    print(f"steps alive across {N_REPS} reps, {N_EVAL_TRIALS} per rep: "
         f"{mean_final:.2f} ± {std_final:.2f}")
     return all_trial_results

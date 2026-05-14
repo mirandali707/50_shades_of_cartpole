@@ -20,7 +20,7 @@ def get_action(state, observation, act_key):
     action = 1 if ctrl_output < 0 else 0
     return action
     
-reset_agent =  init_agent # no learning, so reset is the same as init
+def reset_agent(_=None): return init_agent()
 
 # state = update(state, observation, reward, terminated, truncated, info)
 def no_op(state, *args, **kwargs): return state

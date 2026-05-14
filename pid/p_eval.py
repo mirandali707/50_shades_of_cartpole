@@ -9,17 +9,16 @@ env = gym.make(
     render_mode="none",
 )
 
-N_TRIALS = 100
+N_EVAL_TRIALS = 100
 N_REPS = 10
 
 # prng key
 key = jax.random.PRNGKey(0)
 
-def train_loop(
-    init_agent, 
+def eval_loop(
+    init_trained_agent, 
     reset_agent, 
     get_action, 
-    update, 
     model_name
 ):
     all_trial_results = []
@@ -29,16 +28,16 @@ def train_loop(
         key = jax.random.fold_in(jax.random.PRNGKey(0), rep)
 
         # TODO
-        state = init_agent()
+        state = init_trained_agent()
 
         trial_results = []
 
-        pbar = tqdm(range(N_TRIALS), desc=f"repeat {rep}")
+        pbar = tqdm(range(N_EVAL_TRIALS), desc=f"repeat {rep}")
         for trial_idx in pbar:
             observation, info = env.reset()
 
             # TODO optionally reset the agent
-            state = reset_agent()
+            state = reset_agent(state)
 
             episode_over = False
             steps = 0
@@ -48,15 +47,13 @@ def train_loop(
                 key, act_key = jax.random.split(key)
 
                 # TODO get action (use act_key if it is random)
-                # NOTE PID updates the state in `get_action` because we need to save `last_error`
-                state, action = get_action(state, observation, act_key)
+                action = get_action(state, observation, act_key)
+
+                prev_observation = observation
 
                 # execute action in env
                 observation, reward, terminated, truncated, info = env.step(action)
                 steps += 1
-
-                # TODO do something with the new info
-                state = update(state, observation, reward, terminated, truncated, info)
 
                 episode_over = terminated or truncated
 
@@ -69,14 +66,11 @@ def train_loop(
     env.close()
 
     all_trial_results = np.array(all_trial_results)  # shape (N_REPS, N_TRIALS)
-    np.save(f"{model_name}_100_trial_results.npy", all_trial_results)
+    np.save(f"{model_name}_100_eval_results.npy", all_trial_results)
 
     # Compute average + std steps alive over the last K trials across reps
-    K = 5
-    final_trial_steps = all_trial_results[:, -K]  # shape (N_REPS,K)
-    mean_final = final_trial_steps.mean()
-    std_final = final_trial_steps.std()
-    print(f"Final trial (#{N_TRIALS}) steps alive across {N_REPS} reps: "
+    mean_final = all_trial_results.mean()
+    std_final = all_trial_results.std()
+    print(f"steps alive across {N_REPS} reps, {N_EVAL_TRIALS} per rep: "
         f"{mean_final:.2f} ± {std_final:.2f}")
-        
     return all_trial_results
