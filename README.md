@@ -29,5 +29,6 @@ helps with credit assignment by computing internal reward / reinforcement signal
 
 ![](img/ase_ace.png)
 
-Doesn't do as well as the paper suggests, probably because the box discretization is tuned for their specific simulation (equations at the end of the paper), which OpenAI Gym doesn't reproduce exactly.
-Also, a fairly complicated implementation.
+Doesn't do as well as the paper suggests, probably because the box discretization is tuned for their specific simulation (equations at the end of the paper), which OpenAI Gym doesn't reproduce exactly -- [OpenAI's Gym environment for cartpole](https://github.com/openai/gym/blob/master/gym/envs/classic_control/cartpole.py) is frictionless, whereas the simulation from Sutton & Barto includes friction of the cart on the track as well as friction of the pole on the cart.
+
+Also, for what it's worth this was a fairly complicated implementation.
