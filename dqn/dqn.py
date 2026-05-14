@@ -11,15 +11,17 @@ ALPHA = 0.3
 GAMMA = 0.99
 UPDATE_TARGET_NETWORK_EVERY = 100 # make larger if training for more iters
 D_SIZE = 20
+BATCH_SIZE = 8
 
 
 class QNetwork(nnx.Module):
-    def __init__(self, in_features, n_actions, rngs: nnx.Rngs):
+    def __init__(self, in_features, rngs: nnx.Rngs):
         # little baby MLP, 3-layers, 128 units per hidden layer
+        # Q^(s, a)
         hidden_size = 128
         self.linear1 = nnx.Linear(in_features, hidden_size, rngs=rngs)
         self.linear2 = nnx.Linear(hidden_size, hidden_size, rngs=rngs)
-        self.linear3 = nnx.Linear(hidden_size, n_actions, rngs=rngs)
+        self.linear3 = nnx.Linear(hidden_size, 1, rngs=rngs)
     
     def __call__(self, x):
         x = nnx.relu(self.linear1(x))
@@ -45,12 +47,17 @@ class DQNState(NamedTuple):
     D_current_size: int
 
 
-def make_replay_tuple(prev_observation, action, reward, observation):
+def make_replay_tuple(prev_observation, action, reward, observation, terminated):
     """
-    makes transition (s_t, a_t, r_t, s_t+1) for storage in replay buffer D
+    makes transition (s_t, a_t, r_t, s_t+1, done) for storage in replay buffer D
     """
-    pass
-    # TODO return flattened replay tuple as jnp array
+    return jnp.concatenate([
+        jnp.array(prev_observation, dtype=jnp.float32).flatten(),
+        jnp.array([action], dtype=jnp.float32),
+        jnp.array([reward], dtype=jnp.float32),
+        jnp.array(observation, dtype=jnp.float32).flatten(),
+        jnp.array([float(terminated)], dtype=jnp.float32),
+    ])
 
 
 def init_agent(key, 
@@ -65,14 +72,14 @@ def init_agent(key,
     """
     # input dim is observation size (4) + 1 for action
     # Q^(s, a; w)
-    policy_network = QNetwork(OBS_SIZE + 1, 2, nnx.Rngs(key))
+    policy_network = QNetwork(OBS_SIZE + 1, nnx.Rngs(key))
     # Q^(s, a; w-)
-    target_network = QNetwork(OBS_SIZE + 1, 2, nnx.Rngs(key))
+    target_network = QNetwork(OBS_SIZE + 1, nnx.Rngs(key))
 
-    # (s_t, a_t, r_t, s_t+1)
-    # observation is 4d, action and reward are both scalars
-    replay_tuple_size = OBS_SIZE + 1 + 1 + OBS_SIZE
-    D_replay_buffer=jnp.zeros((D_size, replay_tuple_size))
+    # (s_t, a_t, r_t, s_t+1, done)
+    # observation is 4d, action/reward/done are all scalars
+    replay_tuple_size = OBS_SIZE + 1 + 1 + OBS_SIZE + 1
+    D_replay_buffer = jnp.zeros((D_size, replay_tuple_size))
     return DQNState(
         eps=eps,
         alpha=alpha,
@@ -80,7 +87,8 @@ def init_agent(key,
         policy_network=policy_network,
         target_network=target_network,
         next_target_network_update=next_target_network_update,
-        D_size=D_replay_buffer,
+        D_size=D_size,
+        D_replay_buffer=D_replay_buffer,
         next_replay_idx=0, # idx at which to store next replay tuple
         D_current_size=0 # num elems in replay buffer
     )
@@ -109,10 +117,13 @@ def get_action(state, observation, act_key):
     # exploit! take the action that, based on this observation, we currently think will give us Best Future Returns
     action_qvals = []
     for action in range(N_ACTIONS):
-        # TODO make obs, action pair
-        # TODO pass through state.policy_network
-        pass
-    return int(jnp.argmax(action_qvals))
+        obs_action = jnp.concatenate([
+            jnp.array(observation, dtype=jnp.float32),
+            jnp.array([action], dtype=jnp.float32),
+        ])
+        q_val = state.policy_network(obs_action)
+        action_qvals.append(q_val[0])
+    return int(jnp.argmax(jnp.array(action_qvals)))
 
 
 def update(state, 
@@ -126,12 +137,68 @@ def update(state,
     """
     updates model and returns new model state
     """
-    # TODO!
-    # add current tuple to replay buffer
+    # add current tuple to replay buffer (circular)
+    replay_tuple = make_replay_tuple(prev_observation, action, reward, observation, terminated)
+    idx = state.next_replay_idx % state.D_size
+    new_D = state.D_replay_buffer.at[idx].set(replay_tuple)
+    new_size = min(state.D_current_size + 1, state.D_size)
+    state = state._replace(
+        D_replay_buffer=new_D,
+        next_replay_idx=(idx + 1) % state.D_size,
+        D_current_size=new_size,
+    )
+
+    # need at least one sample before we can learn
+    if state.D_current_size < 1:
+        return state
+
     # sample minibatch from D
-    # if episode terminated, then target = reward
-    # otherwise target is reward + expected discounted reward (from target net)
-    # gradient descent step on (target - policy_network preds) **2
-    # weight update is alpha * grad
+    batch_size = min(state.D_current_size, BATCH_SIZE)
+    sample_key = jax.random.PRNGKey(state.next_replay_idx)
+    indices = jax.random.randint(sample_key, (batch_size,), 0, state.D_current_size)
+    batch = state.D_replay_buffer[indices]  # (batch_size, replay_tuple_size)
+
+    # parse batch columns: s_t | a_t | r_t | s_t+1 | done
+    s_t  = batch[:, :OBS_SIZE]
+    a_t  = batch[:, OBS_SIZE]
+    r_t  = batch[:, OBS_SIZE + 1]
+    s_t1 = batch[:, OBS_SIZE + 2: OBS_SIZE + 2 + OBS_SIZE]
+    done = batch[:, -1]
+
+    # compute targets: if terminal, target = r; else r + gamma * max_a Q_target(s', a)
+    targets = []
+    for i in range(batch_size):
+        next_qvals = jnp.array([
+            state.target_network(jnp.concatenate([s_t1[i], jnp.array([a])]))[0]
+            for a in range(N_ACTIONS)
+        ])
+        bootstrap = r_t[i] + state.gamma * jnp.max(next_qvals)
+        targets.append(jnp.where(done[i], r_t[i], bootstrap))
+    targets = jnp.array(targets)  # (batch_size,)
+
+    # gradient descent step on (target - policy_network preds) ** 2
+    def loss_fn(policy_network):
+        q_preds = jnp.array([
+            policy_network(jnp.concatenate([s_t[i], a_t[i:i+1]]))[0]
+            for i in range(batch_size)
+        ])
+        return jnp.mean((targets - q_preds) ** 2)
+
+    grads = nnx.grad(loss_fn)(state.policy_network)
+
+    # weight update: w = w - alpha * grad
+    params = nnx.state(state.policy_network, nnx.Param)
+    new_params = jax.tree_util.tree_map(
+        lambda p, g: p - state.alpha * g, params, grads
+    )
+    nnx.update(state.policy_network, new_params)
+
+    # periodically sync target network <- policy network
+    new_next_update = state.next_target_network_update - 1
+    if new_next_update <= 0:
+        nnx.update(state.target_network, nnx.state(state.policy_network))
+        new_next_update = UPDATE_TARGET_NETWORK_EVERY
+    state = state._replace(next_target_network_update=new_next_update)
+
     return state
 
