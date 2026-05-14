@@ -9,7 +9,7 @@ env = gym.make(
     render_mode="none",
 )
 
-N_TRIALS = 100
+N_TRIALS = 1000
 N_REPS = 10
 
 # prng key
@@ -33,7 +33,7 @@ def train_loop(
         # independent key per rep, derived from rep index via fold_in
         key = jax.random.fold_in(jax.random.PRNGKey(0), rep)
 
-        # TODO
+        # init agent
         state = init_agent()
 
         trial_results = []
@@ -42,7 +42,7 @@ def train_loop(
         for trial_idx in pbar:
             observation, info = env.reset()
 
-            # TODO optionally reset the agent
+            # Toptionally reset the agent
             # NOTE added state as a param here so reset agent can also be pass thru
             state = reset_agent(state)
 
@@ -53,7 +53,7 @@ def train_loop(
                 # this is the nice jax way to get a new random seed which is properly independent
                 key, act_key = jax.random.split(key)
 
-                # TODO get action (use act_key if it is random)
+                # get action (use act_key if it is random)
                 action = get_action(state, observation, act_key)
 
                 prev_observation = observation
@@ -62,7 +62,7 @@ def train_loop(
                 observation, reward, terminated, truncated, info = env.step(action)
                 steps += 1
 
-                # TODO do something with the new info
+                # do something with the new info
                 # NOTE updated this fn to take in prev_observation and action
                 state = update(state, prev_observation, action, observation, reward, terminated, truncated, info)
 
