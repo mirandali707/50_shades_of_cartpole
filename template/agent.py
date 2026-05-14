@@ -47,3 +47,10 @@ def update(state,
     state = state._replace(foo="bar") # update state
     return state
 
+def save_trained_agent(state):
+    pass
+
+
+def init_trained_agent(key=None):
+    return NewAgent(foo="foo")
+

@@ -2,27 +2,28 @@ from typing import NamedTuple
 from flax import nnx
 import jax.numpy as jnp
 import jax
+import numpy as np
 
 N_ACTIONS = 2
 OBS_SIZE = 4 # observation is x, x_dot, theta, theta_dot
 
 EPSILON = 0.1
-ALPHA = 0.3
+ALPHA = 0.001
 GAMMA = 0.99
-UPDATE_TARGET_NETWORK_EVERY = 100 # make larger if training for more iters
-D_SIZE = 20
-BATCH_SIZE = 8
+UPDATE_TARGET_NETWORK_EVERY = 200 # make larger if training for more iters
+D_SIZE = 500
+BATCH_SIZE = 16
 
 
 class QNetwork(nnx.Module):
     def __init__(self, in_features, rngs: nnx.Rngs):
         # little baby MLP, 3-layers, 128 units per hidden layer
-        # Q^(s, a)
+        # Q^(s) -> [Q(s,0), Q(s,1)]
         hidden_size = 128
         self.linear1 = nnx.Linear(in_features, hidden_size, rngs=rngs)
         self.linear2 = nnx.Linear(hidden_size, hidden_size, rngs=rngs)
-        self.linear3 = nnx.Linear(hidden_size, 1, rngs=rngs)
-    
+        self.linear3 = nnx.Linear(hidden_size, N_ACTIONS, rngs=rngs)
+
     def __call__(self, x):
         x = nnx.relu(self.linear1(x))
         x = nnx.relu(self.linear2(x))
@@ -70,11 +71,8 @@ def init_agent(key,
     """
     returns initial state
     """
-    # input dim is observation size (4) + 1 for action
-    # Q^(s, a; w)
-    policy_network = QNetwork(OBS_SIZE + 1, nnx.Rngs(key))
-    # Q^(s, a; w-)
-    target_network = QNetwork(OBS_SIZE + 1, nnx.Rngs(key))
+    policy_network = QNetwork(OBS_SIZE, nnx.Rngs(key))
+    target_network = QNetwork(OBS_SIZE, nnx.Rngs(key))
 
     # (s_t, a_t, r_t, s_t+1, done)
     # observation is 4d, action/reward/done are all scalars
@@ -96,13 +94,8 @@ def init_agent(key,
 
 def reset_agent(state):
     """
-    reset replay buffer (set size and next idx to 0)
-    do NOT reset policy, target networks - that's how learnign happens!
+    pass thru
     """
-    state = state._replace(
-        next_replay_idx=0,
-        D_current_size=0
-        )
     return state
 
 
@@ -114,25 +107,33 @@ def get_action(state, observation, act_key):
     if jax.random.uniform(explore_key) < state.eps:
         # explore! fancy way of saying "pick 0 or 1 at random"
         return int(jax.random.randint(choice_key, (), 0, N_ACTIONS))
-    # exploit! take the action that, based on this observation, we currently think will give us Best Future Returns
-    action_qvals = []
-    for action in range(N_ACTIONS):
-        obs_action = jnp.concatenate([
-            jnp.array(observation, dtype=jnp.float32),
-            jnp.array([action], dtype=jnp.float32),
-        ])
-        q_val = state.policy_network(obs_action)
-        action_qvals.append(q_val[0])
-    return int(jnp.argmax(jnp.array(action_qvals)))
+    # exploit! one forward pass gives Q-values for all actions
+    obs = jnp.array(observation, dtype=jnp.float32)
+    return int(jnp.argmax(state.policy_network(obs)))
 
 
-def update(state, 
-           prev_observation, 
-           action, 
-           observation, 
-           reward, 
-           terminated, 
-           truncated, 
+@nnx.jit
+def _train_step(policy_network, s_t, a_t, targets, alpha):
+    def loss_fn(model):
+        q_preds = model(s_t)  # (batch_size, N_ACTIONS)
+        q_preds_taken = q_preds[jnp.arange(s_t.shape[0]), a_t]
+        return jnp.mean((targets - q_preds_taken) ** 2)
+
+    grads = nnx.grad(loss_fn)(policy_network)
+    params = nnx.state(policy_network, nnx.Param)
+    new_params = jax.tree_util.tree_map(
+        lambda p, g: p - alpha * g, params, grads
+    )
+    nnx.update(policy_network, new_params)
+
+
+def update(state,
+           prev_observation,
+           action,
+           observation,
+           reward,
+           terminated,
+           truncated,
            info):
     """
     updates model and returns new model state
@@ -160,38 +161,18 @@ def update(state,
 
     # parse batch columns: s_t | a_t | r_t | s_t+1 | done
     s_t  = batch[:, :OBS_SIZE]
-    a_t  = batch[:, OBS_SIZE]
+    a_t  = batch[:, OBS_SIZE].astype(jnp.int32)
     r_t  = batch[:, OBS_SIZE + 1]
     s_t1 = batch[:, OBS_SIZE + 2: OBS_SIZE + 2 + OBS_SIZE]
     done = batch[:, -1]
 
-    # compute targets: if terminal, target = r; else r + gamma * max_a Q_target(s', a)
-    targets = []
-    for i in range(batch_size):
-        next_qvals = jnp.array([
-            state.target_network(jnp.concatenate([s_t1[i], jnp.array([a])]))[0]
-            for a in range(N_ACTIONS)
-        ])
-        bootstrap = r_t[i] + state.gamma * jnp.max(next_qvals)
-        targets.append(jnp.where(done[i], r_t[i], bootstrap))
-    targets = jnp.array(targets)  # (batch_size,)
+    # vectorized target computation: one forward pass for the whole batch
+    next_qvals = state.target_network(s_t1)  # (batch_size, N_ACTIONS)
+    max_next_q = jnp.max(next_qvals, axis=-1)  # (batch_size,)
+    targets = jnp.where(done, r_t, r_t + state.gamma * max_next_q)
 
-    # gradient descent step on (target - policy_network preds) ** 2
-    def loss_fn(policy_network):
-        q_preds = jnp.array([
-            policy_network(jnp.concatenate([s_t[i], a_t[i:i+1]]))[0]
-            for i in range(batch_size)
-        ])
-        return jnp.mean((targets - q_preds) ** 2)
-
-    grads = nnx.grad(loss_fn)(state.policy_network)
-
-    # weight update: w = w - alpha * grad
-    params = nnx.state(state.policy_network, nnx.Param)
-    new_params = jax.tree_util.tree_map(
-        lambda p, g: p - state.alpha * g, params, grads
-    )
-    nnx.update(state.policy_network, new_params)
+    # JIT-compiled gradient step (mutates policy_network in place)
+    _train_step(state.policy_network, s_t, a_t, targets, state.alpha)
 
     # periodically sync target network <- policy network
     new_next_update = state.next_target_network_update - 1
@@ -200,5 +181,28 @@ def update(state,
         new_next_update = UPDATE_TARGET_NETWORK_EVERY
     state = state._replace(next_target_network_update=new_next_update)
 
+    return state
+
+
+def save_trained_agent(state):
+    policy_state = nnx.state(state.policy_network)
+    leaves = jax.tree_util.tree_leaves(policy_state)
+    arrays = {f"w{i:04d}": np.array(leaf) for i, leaf in enumerate(leaves)}
+    np.savez(f"{model_name}_best.npz", **arrays)
+
+
+def init_trained_agent(key=None):
+    if key is None:
+        key = jax.random.PRNGKey(0)
+    state = init_agent(key)
+    saved = np.load(f"{model_name}_best.npz")
+    saved_leaves = [jnp.array(saved[f"w{i:04d}"]) for i in range(len(saved.files))]
+
+    _, policy_state = nnx.split(state.policy_network)
+    treedef = jax.tree_util.tree_structure(policy_state)
+    loaded_state = jax.tree_util.tree_unflatten(treedef, saved_leaves)
+
+    nnx.update(state.policy_network, loaded_state)
+    nnx.update(state.target_network, loaded_state)
     return state
 
