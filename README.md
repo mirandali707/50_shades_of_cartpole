@@ -24,10 +24,15 @@ I didn't even need to add a separate PD controller for the cart position, or the
 Keep a lookup table of Q values, Q(s,a), where each Q value represents *the expected total (discounted) future reward you'll get if you take action a in state s, and then act optimally forever after*.
 As the name implies, we've gotta discretize any pesky continuous observations into boxes first.
 
+Here's the results on 100 trials:
 ![](img/q_learning.png)
 
 Turns out, doesn't work that well with a small number of trials. Was quite finicky to tune as well, and probably I could have tuned it more.
 
+## [Deep Q-learning](dqn/DQN.ipynb)
+Just like tabular Q learning, except we use a NN (I used a baby 3-layer MLP with ReLU activations, hidden state 128) to replace the Q table. Two big ideas:
+1. Keep an experience replay buffer from which, in each iter, we sample a small batch and do SGD to update our NN. 
+2. Keep a separate NN for computing the target value (Q^(s, a; w-)), which we update less frequently than the one we use to predict our action (Q^(s, a; w)). This prevents instability (literally, trying to hit a moving target!)
 
 ## [ASE / ACE](ase_ace/ASE_ACE.ipynb) (Sutton & Barto, 1983)
 Ancestor of modern actor-critic methods! From RL legends, Sutton & Barto.
