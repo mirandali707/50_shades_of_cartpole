@@ -53,7 +53,6 @@ def train_loop(
                 steps += 1
 
                 # TODO do something with the new info
-                # NOTE updated this fn to take in prev_observation and action
                 state = update(state, prev_observation, action, observation, reward, terminated, truncated, info)
 
                 episode_over = terminated or truncated
