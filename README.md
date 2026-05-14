@@ -20,6 +20,15 @@ Not much more code than the P controller, no learning, only needs to keep track 
 I didn't even need to add a separate PD controller for the cart position, or the I term!
 
 # Reinforcement learning
+## [Tabular Q-learning](q_learning/q_learning.ipynb)
+Keep a lookup table of Q values, Q(s,a), where each Q value represents *the expected total (discounted) future reward you'll get if you take action a in state s, and then act optimally forever after*.
+As the name implies, we've gotta discretize any pesky continuous observations into boxes first.
+
+![](img/q_learning.png)
+
+Turns out, doesn't work that well with a small number of trials. Was quite finicky to tune as well, and probably I could have tuned it more.
+
+
 ## [ASE / ACE](ase_ace/ASE_ACE.ipynb) (Sutton & Barto, 1983)
 Ancestor of modern actor-critic methods! From RL legends, Sutton & Barto.
 Discretizes the observation into 162 "boxes", specified by a preivous work by Michie & Chambers.
