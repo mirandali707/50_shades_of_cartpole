@@ -99,3 +99,17 @@ helps with credit assignment by computing internal reward / reinforcement signal
 Doesn't do as well as the paper suggests, probably because the box discretization is tuned for their specific simulation (equations at the end of the paper), which OpenAI Gym doesn't reproduce exactly -- [OpenAI's Gym environment for cartpole](https://github.com/openai/gym/blob/master/gym/envs/classic_control/cartpole.py) is frictionless, whereas the simulation from Sutton & Barto includes friction of the cart on the track as well as friction of the pole on the cart.
 
 Also, for what it's worth this was a fairly complicated implementation.
+
+# Takeaways
+So basically:
+
+<img src="img/bellcurve.jpg" width="700" />
+
+And, more seriously: there are so many interesting connections between all these methods!
+The more I implemented the more that I realized all the categories are blurry.
+Just to name a few:
+* first a somewhat obvious one: DQN is tabular Q-learning but instead of a table of Q values we have a neural net
+* model-based RL is basically "learn the model, then do MPC", except we tend to use $\gamma$ discounting instead of a fixed time horizon, and we try our best to not have to re-optimize too much every time step by learning a more general policy or value function that applies everywhere.
+* [LQR is the the Bellman equation for value iteration solved analytically](https://underactuated.mit.edu/lqr.html), assuming linear dynamics and quadratic rewards -- the Riccati equation yields the parameters of the optimal (quadratic) value function
+* LQR is the optimal PD controller: a galaxy-brained version where you tune all the gains in tandem.
+* MPC is (or can be, if we assume linear dymanics + quadratic rewards) LQR but instead of solving for K just once, we solve every timestep
