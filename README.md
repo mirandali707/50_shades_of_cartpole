@@ -1,6 +1,7 @@
 # 50 shades of cartpole
 [NMM 2026](https://fab.cba.mit.edu/classes/MAS.864/) final project: RL vs classical control vs search methods for cartpole.
-[This spreadsheet](https://docs.google.com/spreadsheets/d/1qUzuzJ2d2wACyRdAANu_JexWEW6xBzRqvHZk63TVAFM/edit?gid=184273463#gid=184273463) has an overview of the results!
+
+> [This spreadsheet](https://docs.google.com/spreadsheets/d/1qUzuzJ2d2wACyRdAANu_JexWEW6xBzRqvHZk63TVAFM/edit?gid=184273463#gid=184273463) has an overview of the results!
 
 ![](img/50shadesofcartpole.png)
 
