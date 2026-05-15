@@ -15,6 +15,14 @@ Here we randomly initialize a weight vector $w$ and roll out a trajectory (trial
 
 65.44 ± 111.25 steps, taking the best of 10 models after 1000 rollouts per model.
 
+## [Basic random search](basic_random_search/main.ipynb)
+Here we implement the Basic Random Search algorithm from [Simple random search provides a competitive approach to reinforcement learning](https://arxiv.org/pdf/1803.07055).
+For each "iteration" of the algorithm we perturb our weight vector theta symmetrically in N random directions (+/- direction) and rollout each of those weight vectors. After collecting the reward from those trajectories, we take the differences between the + and - rewards in each direction, multiply them by the direction they were derived from, and average that (scaled by alpha). Basically, we want to nudge our theta in the directions which did better, scaled by how much better they did.
+
+![](img/basic_random_search.png)
+
+Honestly, awesome! Pretty much converges after 250 or so iters. And, at evaluation time does great: 499.94 ± 0.85.
+
 # Classical control
 ## [PID](pid/PID.ipynb)
 ### P (proportional) on pole angle
