@@ -5,6 +5,8 @@ from scipy.linalg import solve_discrete_are
 
 model_name = "LQR"
 
+SAVE_PATH = "lqr_best.npz"
+
 
 class LQRAgent(NamedTuple):
     """
