@@ -84,6 +84,8 @@ Just like tabular Q learning, except we use a NN (I used a baby 3-layer MLP with
 1. Keep an experience replay buffer from which, in each iter, we sample a small batch and do SGD to update our NN. 
 2. Keep a separate NN for computing the target value (Q^(s, a; w-)), which we update less frequently than the one we use to predict our action (Q^(s, a; w)). This prevents instability (literally, trying to hit a moving target!)
 
+![](img/dqn.png)
+
 <video src="dqn/DQN-episode-0.mp4" controls width="480"></video>
 
 
@@ -99,6 +101,8 @@ helps with credit assignment by computing internal reward / reinforcement signal
 Doesn't do as well as the paper suggests, probably because the box discretization is tuned for their specific simulation (equations at the end of the paper), which OpenAI Gym doesn't reproduce exactly -- [OpenAI's Gym environment for cartpole](https://github.com/openai/gym/blob/master/gym/envs/classic_control/cartpole.py) is frictionless, whereas the simulation from Sutton & Barto includes friction of the cart on the track as well as friction of the pole on the cart.
 
 Also, for what it's worth this was a fairly complicated implementation.
+
+![](img/ase_ace1000.png)
 
 # Takeaways
 So basically:
