@@ -16,6 +16,9 @@ Here we randomly initialize a weight vector $w$ and roll out a trajectory (trial
 
 65.44 ± 111.25 steps, taking the best of 10 models after 1000 rollouts per model.
 
+
+https://github.com/user-attachments/assets/c2f35555-371b-460a-9e30-e3d248fdc596
+
 <video src="pure_random_search/Pure Random Search-episode-0.mp4" controls width="480"></video>
 
 ## [Basic random search](basic_random_search/main.ipynb)
@@ -25,6 +28,8 @@ For each "iteration" of the algorithm we perturb our weight vector theta symmetr
 ![](img/basic_random_search.png)
 
 Honestly, awesome! Pretty much converges after 250 or so iters. And, at evaluation time does great: 499.94 ± 0.85.
+
+https://github.com/user-attachments/assets/1535d4a6-68da-4f38-866c-61ff67bf4c79
 
 <video src="basic_random_search/Basic Random Search-episode-0.mp4" controls width="480"></video>
 
@@ -36,6 +41,8 @@ Take the error of the pole angle (relative to 0, the goal), multiply that by the
 Incredibly simple to write, no learning, no model state... dead simple. 
 Doesn't do very well though (but better than random): 48.00 ± 10.58 after 10 repeats of 100 trials.
 
+https://github.com/user-attachments/assets/940557f0-d4cf-4824-b0fc-272cc144873f
+
 <video src="pid/P (proportional) controller-episode-0.mp4" controls width="480"></video>
 
 ### PD (proportional + derivative) on pole angle
@@ -44,12 +51,16 @@ Do the same thing as the P (proportional) controller except add another term tha
 Not much more code than the P controller, no learning, only needs to keep track of the last error. And, it SOLVES CARTPOLE! 500.00 ± 0.00 steps (the max for this Cartpole env) straight out of the box (notably I used someone else's hand-tuned gain).
 I didn't even need to add a separate PD controller for the cart position, or the I term!
 
+https://github.com/user-attachments/assets/37b5b036-76f7-4624-9714-eb79f1d90b0c
+
 <video src="pid/PD controller-episode-0.mp4" controls width="480"></video>
 
 ## [LQR](lqr/LQR.ipynb)
 Sort of like a generalization of PID in that we are now computing an optimal gain *matrix* $K$, but not like PID in that we compute this optimal gain matrix from the dynamics model. In order to do this we have to linearize our state (basically, approximate the sines and cosines in our dynamics equations with constants) and agree that what we mean by "optimal" is "minimum of a quadratic cost function that balances performance (error in pole angle) against efficiency (actuator effort). I go into a lot more detail in the notebook itself.
 
 This performs really well out of the box (500.00 ± 0.00), just like the PD controller! Though I have to imagine it's actually *better* than a PD controller, and cartpole is just too easy...
+
+https://github.com/user-attachments/assets/4ac395b1-dbea-4742-9794-4959b2896a36
 
 <video src="lqr/LQR-episode-0.mp4" controls width="480"></video>
 
@@ -60,6 +71,8 @@ It does constrained optimization over a fixed time-horizon to find the trajector
 [My implementation](agent.py) linearizes the dynamics just as we do in LQR and then uses the same ol quadratic cost function, but you could optimize over whatever you wanted!
 
 Works great. 499.99 ± 0.17 on eval.
+
+https://github.com/user-attachments/assets/1c4ff64b-a957-4a3b-8ec1-205d693eff63
 
 <video src="mpc/MPC-episode-0.mp4" controls width="480"></video>
 
@@ -77,6 +90,8 @@ Here's the results on 1000 trials:
 ![](img/q_learning1000.png) (305.35 ± 112.35 steps, evaluated over 1000 trials)
 Interestingly, the learning seems to plateau after 200 or so trials, and the agent never gets much better than the 200/300 steps range.
 
+https://github.com/user-attachments/assets/26eacfe0-723f-4698-8572-6b86f5d4478b
+
 <video src="q_learning/Boxes Q-learning-episode-0.mp4" controls width="480"></video>
 
 
@@ -86,6 +101,8 @@ Just like tabular Q learning, except we use a NN (I used a baby 3-layer MLP with
 2. Keep a separate NN for computing the target value (Q^(s, a; w-)), which we update less frequently than the one we use to predict our action (Q^(s, a; w)). This prevents instability (literally, trying to hit a moving target!)
 
 ![](img/dqn.png)
+
+https://github.com/user-attachments/assets/ce182ab4-7da6-4967-8be6-cbb1b675bcbb
 
 <video src="dqn/DQN-episode-0.mp4" controls width="480"></video>
 
